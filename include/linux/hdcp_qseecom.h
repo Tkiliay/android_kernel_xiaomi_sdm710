@@ -212,10 +212,36 @@ struct hdcp_register_data {
 	void **hdcp_ctx;
 };
 
+#ifdef CONFIG_HDCP_QSEECOM
 int hdcp_library_register(struct hdcp_register_data *data);
 void hdcp_library_deregister(void *phdcpcontext);
 bool hdcp1_check_if_supported_load_app(void);
 void hdcp1_unload_app(void);
 int hdcp1_set_keys(uint32_t *aksv_msb, uint32_t *aksv_lsb);
 int hdcp1_set_enc(bool enable);
+#else
+static inline int hdcp_library_register(struct hdcp_register_data *data)
+{
+	return 0;
+}
+static inline void hdcp_library_deregister(void *phdcpcontext)
+{
+}
+static inline bool hdcp1_check_if_supported_load_app(void)
+{
+	return true;
+}
+static inline void hdcp1_unload_app(void)
+{
+}
+static inline int hdcp1_set_keys(uint32_t *aksv_msb, uint32_t *aksv_lsb)
+{
+	return 0;
+}
+static inline int hdcp1_set_enc(bool enable)
+{
+	return 0;
+}
+#endif
+
 #endif /* __HDCP_QSEECOM_H */
