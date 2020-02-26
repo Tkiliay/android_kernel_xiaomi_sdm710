@@ -20,7 +20,6 @@
 #include "segment.h"
 #include "node.h"
 #include "gc.h"
-#include "trace.h"
 #include <trace/events/f2fs.h>
 
 #define __reverse_ffz(x) __reverse_ffs(~(x))
@@ -186,8 +185,6 @@ bool f2fs_need_SSR(struct f2fs_sb_info *sbi)
 void f2fs_register_inmem_page(struct inode *inode, struct page *page)
 {
 	struct inmem_pages *new;
-
-	f2fs_trace_pid(page);
 
 	f2fs_set_page_private(page, (unsigned long)ATOMIC_WRITTEN_PAGE);
 
@@ -504,8 +501,19 @@ void f2fs_balance_fs(struct f2fs_sb_info *sbi, bool need)
 	 * dir/node pages without enough free segments.
 	 */
 	if (has_not_enough_free_secs(sbi, 0, 0)) {
-		down_write(&sbi->gc_lock);
-		f2fs_gc(sbi, false, false, NULL_SEGNO);
+		if (test_opt(sbi, GC_MERGE) && sbi->gc_thread &&
+					sbi->gc_thread->f2fs_gc_task) {
+			DEFINE_WAIT(wait);
+
+			prepare_to_wait(&sbi->gc_thread->fggc_wq, &wait,
+						TASK_UNINTERRUPTIBLE);
+			wake_up(&sbi->gc_thread->gc_wait_queue_head);
+			io_schedule();
+			finish_wait(&sbi->gc_thread->fggc_wq, &wait);
+		} else {
+			down_write(&sbi->gc_lock);
+			f2fs_gc(sbi, false, false, NULL_SEGNO);
+		}
 	}
 }
 
@@ -601,8 +609,6 @@ repeat:
 	if (kthread_should_stop())
 		return 0;
 
-	sb_start_intwrite(sbi->sb);
-
 	if (!llist_empty(&fcc->issue_list)) {
 		struct flush_cmd *cmd, *next;
 		int ret;
@@ -622,8 +628,6 @@ repeat:
 		}
 		fcc->dispatch_list = NULL;
 	}
-
-	sb_end_intwrite(sbi->sb);
 
 	wait_event_interruptible(*q,
 		kthread_should_stop() || !llist_empty(&fcc->issue_list));
@@ -2815,6 +2819,15 @@ skip:
 
 		if (fatal_signal_pending(current))
 			break;
+
+		/*
+		 * If the trim thread is running and we receive the SCREEN_ON
+		 * event, we will send SIGUSR1 singnal to teriminate the trim
+		 * thread. So if there is a SIGUSR1 signal pending in current
+		 * thread, we need stop issuing discard commands and return.
+		 */
+		if (signal_pending(current) && sigismember(&current->pending.signal, SIGUSR1))
+			break;
 	}
 
 	blk_finish_plug(&plug);
@@ -2867,15 +2880,6 @@ int f2fs_trim_fs(struct f2fs_sb_info *sbi, struct fstrim_range *range)
 	err = f2fs_write_checkpoint(sbi, &cpc);
 	up_write(&sbi->gc_lock);
 	if (err)
-		goto out;
-
-	/*
-	 * We filed discard candidates, but actually we don't need to wait for
-	 * all of them, since they'll be issued in idle time along with runtime
-	 * discard option. User configuration looks like using runtime discard
-	 * or periodic fstrim instead of it.
-	 */
-	if (f2fs_realtime_discard_enable(sbi))
 		goto out;
 
 	start_block = START_BLOCK(sbi, start_segno);
@@ -4074,7 +4078,7 @@ static int build_sit_info(struct f2fs_sb_info *sbi)
 	sit_i->dirty_sentries = 0;
 	sit_i->sents_per_block = SIT_ENTRY_PER_BLOCK;
 	sit_i->elapsed_time = le64_to_cpu(sbi->ckpt->elapsed_time);
-	sit_i->mounted_time = ktime_get_real_seconds();
+	sit_i->mounted_time = ktime_get_boottime_seconds();
 	init_rwsem(&sit_i->sentry_lock);
 	return 0;
 }

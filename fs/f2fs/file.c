@@ -27,7 +27,6 @@
 #include "xattr.h"
 #include "acl.h"
 #include "gc.h"
-#include "trace.h"
 #include <trace/events/f2fs.h>
 #include <trace/events/android_fs.h>
 
@@ -162,6 +161,8 @@ static inline enum cp_reason_type need_do_checkpoint(struct inode *inode)
 		cp_reason = CP_HARDLINK;
 	else if (is_sbi_flag_set(sbi, SBI_NEED_CP))
 		cp_reason = CP_SB_NEED_CP;
+	else if (f2fs_parent_inode_xattr_set(inode))
+		cp_reason = CP_PARENT_XATTR_SET;
 	else if (file_wrong_pino(inode))
 		cp_reason = CP_WRONG_PINO;
 	else if (!f2fs_space_for_roll_forward(sbi))
@@ -340,7 +341,6 @@ flush_out:
 	f2fs_update_time(sbi, REQ_TIME);
 out:
 	trace_f2fs_sync_file_exit(inode, cp_reason, datasync, ret);
-	f2fs_trace_ios(NULL, 1);
 	trace_android_fs_fsync_end(inode, start, end - start);
 
 	return ret;
