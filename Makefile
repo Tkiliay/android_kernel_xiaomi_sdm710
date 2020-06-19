@@ -682,6 +682,14 @@ LLVM_DIS	:= llvm-dis
 export LLVM_AR LLVM_DIS
 endif
 
+ifeq ($(cc-name),clang)
+ifeq ($(ld-name),lld)
+LDFLAGS += -O2
+# Set O3 optimization level for LTO
+LDFLAGS		+= --plugin-opt=O3
+endif
+endif
+
 # The arch Makefile can set ARCH_{CPP,A,C}FLAGS to override the default
 # values of the respective KBUILD_* variables
 ARCH_CPPFLAGS :=
