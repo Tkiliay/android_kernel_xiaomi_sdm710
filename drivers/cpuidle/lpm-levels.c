@@ -561,7 +561,7 @@ static void cluster_prepare(struct lpm_cluster *cluster,
 	if (cluster->min_child_level > child_idx)
 		return;
 
-	spin_lock(&cluster->sync_lock);
+	raw_spin_lock(&cluster->sync_lock);
 	cpumask_or(&cluster->num_children_in_sync, cpu,
 			&cluster->num_children_in_sync);
 
@@ -597,10 +597,10 @@ static void cluster_prepare(struct lpm_cluster *cluster,
 	cluster_prepare(cluster->parent, &cluster->num_children_in_sync, i,
 			from_idle, start_time);
 
-	spin_unlock(&cluster->sync_lock);
+	raw_spin_unlock(&cluster->sync_lock);
 	return;
 failed:
-	spin_unlock(&cluster->sync_lock);
+	raw_spin_unlock(&cluster->sync_lock);
 	if (IS_ENABLED(CONFIG_MSM_IDLE_STATS))
 		cluster->stats->sleep_time = 0;
 }
@@ -619,7 +619,7 @@ static void cluster_unprepare(struct lpm_cluster *cluster,
 	if (cluster->min_child_level > child_idx)
 		return;
 
-	spin_lock(&cluster->sync_lock);
+	raw_spin_lock(&cluster->sync_lock);
 	last_level = cluster->default_level;
 	first_cpu = cpumask_equal(&cluster->num_children_in_sync,
 				&cluster->child_cpus);
@@ -663,7 +663,7 @@ static void cluster_unprepare(struct lpm_cluster *cluster,
 	cluster_unprepare(cluster->parent, &cluster->child_cpus,
 			last_level, from_idle, end_time, success);
 unlock_return:
-	spin_unlock(&cluster->sync_lock);
+	raw_spin_unlock(&cluster->sync_lock);
 }
 
 static inline void cpu_prepare(struct lpm_cpu *cpu, int cpu_index,
@@ -704,7 +704,7 @@ static int get_cluster_id(struct lpm_cluster *cluster, int *aff_lvl,
 	if (!cluster)
 		return 0;
 
-	spin_lock(&cluster->sync_lock);
+	raw_spin_lock(&cluster->sync_lock);
 
 	if (!cpumask_equal(&cluster->num_children_in_sync,
 				&cluster->child_cpus))
@@ -730,7 +730,7 @@ static int get_cluster_id(struct lpm_cluster *cluster, int *aff_lvl,
 			(*aff_lvl)++;
 	}
 unlock_and_return:
-	spin_unlock(&cluster->sync_lock);
+	raw_spin_unlock(&cluster->sync_lock);
 	return state_id;
 }
 
@@ -955,13 +955,13 @@ static int cluster_cpuidle_register(struct lpm_cluster *cl)
 			while (p) {
 				int j;
 
-				spin_lock(&p->sync_lock);
+				raw_spin_lock(&p->sync_lock);
 				cpumask_set_cpu(cpu, &p->num_children_in_sync);
 				for (j = 0; j < p->nlevels; j++)
 					cpumask_copy(
 						&p->levels[j].num_cpu_votes,
 						&p->num_children_in_sync);
-				spin_unlock(&p->sync_lock);
+				raw_spin_unlock(&p->sync_lock);
 				p = p->parent;
 			}
 		}
