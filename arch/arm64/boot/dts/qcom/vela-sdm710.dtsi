@@ -19,6 +19,13 @@
 			compatible = "android,vbmeta";
 			parts = "vbmeta,boot,system,vendor,dtbo,recovery";
 		};
+
+		fstab {
+			compatible = "android,fstab";
+			system {
+				status = "disabled";
+			};
+		};
 	};
 };
 
