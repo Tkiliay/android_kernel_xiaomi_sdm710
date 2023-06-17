@@ -21,7 +21,7 @@
 #include <asm/assembler.h>
 
 /*
-/* Assumptions:
+ * Assumptions:
  *
  * ARMv8-a, AArch64, unaligned accesses, min page size 4k.
  */
