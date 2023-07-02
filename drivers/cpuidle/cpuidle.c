@@ -646,7 +646,6 @@ EXPORT_SYMBOL_GPL(cpuidle_register);
 static void wake_up_idle_cpus(void *v)
 {
 
-	int cpu;
 	unsigned long cpus = atomic_read(&idled) & *cpumask_bits(to_cpumask(v));
 
 	/* Use READ_ONCE to get the isolated mask outside cpu_add_remove_lock */
