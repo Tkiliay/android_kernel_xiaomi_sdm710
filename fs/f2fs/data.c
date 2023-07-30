@@ -373,12 +373,6 @@ submit_io:
 	submit_bio(bio);
 }
 
-static void __f2fs_submit_read_bio(struct f2fs_sb_info *sbi,
-				struct bio *bio, enum page_type type)
-{
-	__submit_bio(sbi, bio, type);
-}
-
 static void __submit_merged_bio(struct f2fs_bio_info *io)
 {
 	struct f2fs_io_info *fio = &io->fio;
@@ -532,10 +526,7 @@ int f2fs_submit_page_bio(struct f2fs_io_info *fio)
 	inc_page_count(fio->sbi, is_read_io(fio->op) ?
 			__read_io_type(page): WB_DATA_TYPE(fio->page));
 
-	if (is_read_io(fio->op))
-		__f2fs_submit_read_bio(fio->sbi, bio, fio->type);
-	else
-		__submit_bio(fio->sbi, bio, fio->type);
+	__submit_bio(fio->sbi, bio, fio->type);
 	return 0;
 }
 
@@ -894,7 +885,7 @@ static int f2fs_submit_page_read(struct inode *inode, struct page *page,
 	}
 	ClearPageError(page);
 	inc_page_count(sbi, F2FS_RD_DATA);
-	__f2fs_submit_read_bio(sbi, bio, DATA);
+	__submit_bio(sbi, bio, DATA);
 	return 0;
 }
 
