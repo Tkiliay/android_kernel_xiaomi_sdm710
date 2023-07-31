@@ -43,6 +43,17 @@ static inline void gc_set_wakelock(struct f2fs_sb_info *sbi,
 	}
 }
 
+static inline bool should_break_gc(struct f2fs_sb_info *sbi)
+{
+	if (freezing(current) || kthread_should_stop())
+		return true;
+
+	if (sbi->gc_mode == GC_URGENT)
+		return false;
+
+	return !is_idle(sbi, GC_TIME);
+}
+
 static int gc_thread_func(void *data)
 {
 	struct f2fs_sb_info *sbi = data;
@@ -50,6 +61,8 @@ static int gc_thread_func(void *data)
 	wait_queue_head_t *wq = &sbi->gc_thread->gc_wait_queue_head;
 	wait_queue_head_t *fggc_wq = &sbi->gc_thread->fggc_wq;
 	unsigned int wait_ms = gc_th->min_sleep_time;
+	unsigned int gc_count, i;
+	bool boost;
 	bool force_gc;
 
 	set_freezable();
@@ -105,6 +118,8 @@ static int gc_thread_func(void *data)
 			continue;
 		}
 
+		boost = sbi->gc_booster;
+
 		/*
 		 * [GC triggering condition]
 		 * 0. GC is not conducted currently.
@@ -140,35 +155,56 @@ static int gc_thread_func(void *data)
 			goto next;
 		}
 
-		if (has_enough_invalid_blocks(sbi))
-			decrease_sleep_time(gc_th, &wait_ms);
-		else
-			increase_sleep_time(gc_th, &wait_ms);
+		if (boost)
+			calculate_sleep_time(sbi, gc_th, &wait_ms);
+		else {
+			if (has_enough_invalid_blocks(sbi))
+				decrease_sleep_time(gc_th, &wait_ms);
+			else
+				increase_sleep_time(gc_th, &wait_ms);
+		}
 do_gc:
-		if (!foreground)
-			stat_inc_bggc_count(sbi->stat_info);
+		gc_count = (boost && !foreground) ? get_gc_count(sbi) : 1;
 
-		sync_mode = test_opt(sbi, FORCE_FG_GC);
-
-		/* foreground GC was been triggered via f2fs_balance_fs() */
-		if (foreground)
-			sync_mode = false;
-
-		/* if return value is not 0, no victim was selected */
-		if (f2fs_gc(sbi, force_gc || sync_mode, !foreground, NULL_SEGNO)) {
-			wait_ms = gc_th->no_gc_sleep_time;
-			gc_set_wakelock(sbi, gc_th, false);
-			sbi->gc_mode = GC_NORMAL;
-			/*f2fs_msg(sbi->sb, KERN_INFO,
-				"No more GC victim found, "
-				"sleeping for %u ms", wait_ms);*/
-
+		for (i = 0; i < gc_count; i++) {
 			/*
-			 * Rapid GC would have cleaned hundreds of segments
-			 * that would not be read again anytime soon.
+			 * f2fs_gc will release gc_lock before return,
+			 * so we need to relock it before calling f2fs_gc.
 			 */
-			mm_drop_caches(3);
-			//f2fs_msg(sbi->sb, KERN_INFO, "dropped caches");
+			if (i && !down_write_trylock(&sbi->gc_lock)) {
+				stat_other_skip_bggc_count(sbi);
+				break;
+			}
+
+			if (!foreground)
+				stat_inc_bggc_count(sbi->stat_info);
+
+			sync_mode = test_opt(sbi, FORCE_FG_GC);
+
+			/* foreground GC was been triggered via f2fs_balance_fs() */
+			if (foreground)
+				sync_mode = false;
+
+			/* if return value is not 0, no victim was selected */
+			if (f2fs_gc(sbi, force_gc || sync_mode, !foreground, NULL_SEGNO)) {
+				wait_ms = gc_th->no_gc_sleep_time;
+				gc_set_wakelock(sbi, gc_th, false);
+				sbi->gc_mode = GC_NORMAL;
+				/*f2fs_msg(sbi->sb, KERN_INFO,
+					"No more GC victim found, "
+					"sleeping for %u ms", wait_ms);*/
+
+				/*
+				 * Rapid GC would have cleaned hundreds of segments
+				 * that would not be read again anytime soon.
+				 */
+				mm_drop_caches(3);
+				//f2fs_msg(sbi->sb, KERN_INFO, "dropped caches");
+				break;
+			}
+
+			if (should_break_gc(sbi))
+				break;
 		}
 
 		if (foreground)
