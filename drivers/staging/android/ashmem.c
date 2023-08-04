@@ -315,7 +315,7 @@ static ssize_t ashmem_read_iter(struct kiocb *iocb, struct iov_iter *iter)
 	 * ashmem_release is called.
 	 */
 	mutex_unlock(&ashmem_mutex);
-	ret = vfs_iter_read(asma->file, iter, &iocb->ki_pos, 0);
+	ret = vfs_iter_read(asma->file, iter, &iocb->ki_pos);
 	mutex_lock(&ashmem_mutex);
 	if (ret > 0)
 		asma->file->f_pos = iocb->ki_pos;
@@ -446,7 +446,7 @@ static int ashmem_mmap(struct file *file, struct vm_area_struct *vma)
 			goto out;
 		}
 	} else {
-		vma_set_anonymous(vma);
+		vma->vm_ops = NULL;
 	}
 
 	if (vma->vm_file)
