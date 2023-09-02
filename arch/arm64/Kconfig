@@ -1060,14 +1060,6 @@ endmenu
 
 menu "ARMv8.2 architectural features"
 
-config AS_HAS_ARMV8_2
-	bool "Enable support for XOR specific ARMv8.2 features"
-	default n
-
-config AS_HAS_SHA3
-	bool "Enable support for EOR3 instructions if CPU implements SHA-3 extension"
-	default n
-
 config ARM64_UAO
 	bool "Enable support for User Access Override (UAO)"
 	default y
