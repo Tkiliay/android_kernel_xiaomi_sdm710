@@ -161,9 +161,10 @@ static struct fscrypt_mode available_modes[] = {
 		.ivsize = 32,
 	},
 	[FS_ENCRYPTION_MODE_PRIVATE] = {
-		.friendly_name = "ICE",
-		.cipher_str = "bugon",
+		.friendly_name = "Inline encryption (AES-256-XTS)",
+		.cipher_str = NULL,
 		.keysize = 64,
+		.ivsize = 16,
 	},
 };
 
