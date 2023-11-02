@@ -162,7 +162,7 @@ static struct fscrypt_mode available_modes[] = {
 	},
 	[FS_ENCRYPTION_MODE_PRIVATE] = {
 		.friendly_name = "Inline encryption (AES-256-XTS)",
-		.cipher_str = NULL,
+		.cipher_str = "xts(aes)",
 		.keysize = 64,
 		.ivsize = 16,
 	},
