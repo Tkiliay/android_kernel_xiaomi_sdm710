@@ -1128,8 +1128,7 @@ static void __init_discard_policy(struct f2fs_sb_info *sbi,
 		if (utilization(sbi) > dcc->discard_urgent_util) {
 			dpolicy->granularity = 1;
 			if (atomic_read(&dcc->discard_cmd_cnt))
-				dpolicy->max_interval =
-					dcc->min_discard_issue_time;
+				dpolicy->max_interval = 10000;
 		}
 	} else if (discard_type == DPOLICY_FORCE) {
 		dpolicy->min_interval = 1;
