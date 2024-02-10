@@ -1410,6 +1410,10 @@ struct f2fs_sb_info {
 	/* migration granularity of garbage collection, unit: segment */
 	unsigned int migration_granularity;
 
+	/* The used to trick Android IdleMaint fake node */
+	unsigned int mgc_urgent;
+	unsigned int mgc_urgent_time;
+
 	/*
 	 * for stat information.
 	 * one is for the LFS mode, and the other is for the SSR mode.
