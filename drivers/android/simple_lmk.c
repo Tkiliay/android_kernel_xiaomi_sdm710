@@ -38,6 +38,18 @@ static int nr_victims;
 static atomic_t needs_reclaim = ATOMIC_INIT(0);
 static atomic_t nr_killed = ATOMIC_INIT(0);
 
+static unsigned int minfree_pages = CONFIG_ANDROID_SIMPLE_LMK_MINFREE;
+module_param(minfree_pages, uint, 0644);
+
+static unsigned int reclaim_timeout = CONFIG_ANDROID_SIMPLE_LMK_TIMEOUT_MSEC;
+module_param(reclaim_timeout, uint, 0644);
+
+static unsigned short mpressure = 99;
+module_param(mpressure, short, 0644);
+
+#define MIN_FREE_PAGES (minfree_pages * SZ_1M / PAGE_SIZE)
+#define RECLAIM_EXPIRES msecs_to_jiffies(reclaim_timeout)
+
 static int victim_cmp(const void *lhs_ptr, const void *rhs_ptr)
 {
 	const struct victim_info *lhs = (typeof(lhs))lhs_ptr;
@@ -317,7 +329,7 @@ void simple_lmk_mm_freed(struct mm_struct *mm)
 static int simple_lmk_vmpressure_cb(struct notifier_block *nb,
 				    unsigned long pressure, void *data)
 {
-	if (pressure == 100) {
+	if (pressure >= mpressure) {
 		atomic_set(&needs_reclaim, 1);
 		smp_mb__after_atomic();
 		if (waitqueue_active(&oom_waitq))
