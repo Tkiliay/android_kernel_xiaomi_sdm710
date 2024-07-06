@@ -29,6 +29,7 @@
 *.bz2
 *.lzma
 *.xz
+*.sh
 *.lz4
 *.lzo
 *.patch
